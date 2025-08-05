@@ -6,19 +6,40 @@ const cors = require('cors');
 const app = express();
 const server = http.createServer(app);
 
-// Basic CORS
+// Get environment variables
+const PORT = process.env.PORT || 3000;
+const NODE_ENV = process.env.NODE_ENV || 'development';
+const CORS_ORIGIN = process.env.CORS_ORIGIN || 'https://airsoftar.vercel.app';
+const CORS_CREDENTIALS = process.env.CORS_CREDENTIALS === 'true';
+const SOCKETIO_CORS_ORIGIN = process.env.SOCKETIO_CORS_ORIGIN || 'https://airsoftar.vercel.app';
+const SOCKETIO_TRANSPORTS = process.env.SOCKETIO_TRANSPORTS ? process.env.SOCKETIO_TRANSPORTS.split(',') : ['websocket', 'polling'];
+const LOG_LEVEL = process.env.LOG_LEVEL || 'info';
+
+console.log('🔧 Environment Variables:');
+console.log(`  PORT: ${PORT}`);
+console.log(`  NODE_ENV: ${NODE_ENV}`);
+console.log(`  CORS_ORIGIN: ${CORS_ORIGIN}`);
+console.log(`  CORS_CREDENTIALS: ${CORS_CREDENTIALS}`);
+console.log(`  SOCKETIO_CORS_ORIGIN: ${SOCKETIO_CORS_ORIGIN}`);
+console.log(`  SOCKETIO_TRANSPORTS: ${SOCKETIO_TRANSPORTS.join(', ')}`);
+console.log(`  LOG_LEVEL: ${LOG_LEVEL}`);
+
+// CORS configuration
 app.use(cors({
-  origin: true,
-  credentials: true
+  origin: CORS_ORIGIN,
+  credentials: CORS_CREDENTIALS,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
 }));
 
-// Socket.io with minimal config
+// Socket.io with environment-based config
 const io = socketIo(server, {
   cors: {
-    origin: true,
-    credentials: true
+    origin: SOCKETIO_CORS_ORIGIN,
+    credentials: CORS_CREDENTIALS,
+    methods: ['GET', 'POST']
   },
-  transports: ['polling', 'websocket']
+  transports: SOCKETIO_TRANSPORTS
 });
 
 // Health check
@@ -29,8 +50,10 @@ app.get('/', (req, res) => {
     socketio: 'enabled',
     connections: io.engine.clientsCount,
     uptime: process.uptime(),
-    env: process.env.NODE_ENV || 'development',
-    port: process.env.PORT || 3000
+    env: NODE_ENV,
+    port: PORT,
+    cors_origin: CORS_ORIGIN,
+    socketio_origin: SOCKETIO_CORS_ORIGIN
   });
 });
 
@@ -70,10 +93,8 @@ io.on('connection', (socket) => {
 });
 
 // Start server
-const PORT = process.env.PORT || 3000;
-
 console.log('🚀 Starting Airsoft AR Battle Server...');
-console.log(`🔧 Environment: ${process.env.NODE_ENV || 'development'}`);
+console.log(`🔧 Environment: ${NODE_ENV}`);
 console.log(`🔧 Port: ${PORT}`);
 console.log(`🔧 Process ID: ${process.pid}`);
 
@@ -82,6 +103,8 @@ server.listen(PORT, () => {
   console.log(`🌐 Socket.io enabled`);
   console.log(`🔗 Health: http://localhost:${PORT}`);
   console.log(`🎯 Ready for connections!`);
+  console.log(`🔧 CORS Origin: ${CORS_ORIGIN}`);
+  console.log(`🔧 Socket.io Origin: ${SOCKETIO_CORS_ORIGIN}`);
 });
 
 // Handle process errors
