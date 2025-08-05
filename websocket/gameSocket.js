@@ -24,6 +24,7 @@ class GameSocketManager {
   setupEventHandlers() {
     this.io.on('connection', (socket) => {
       console.log(`🔌 Player connected: ${socket.id}`);
+      console.log(`📊 Total connected clients: ${this.io.sockets.sockets.size}`);
 
       // Send welcome message
       socket.emit('serverStatus', {
@@ -31,9 +32,12 @@ class GameSocketManager {
         type: 'realServer',
         timestamp: Date.now()
       });
+      
+      console.log(`📤 Sent welcome message to ${socket.id}`);
 
       // Lobby events (from frontend)
       socket.on('player_join', (messageData) => {
+        console.log(`📥 Received player_join event from ${socket.id}:`, JSON.stringify(messageData, null, 2));
         this.handleLobbyPlayerJoin(socket, messageData);
       });
 
@@ -193,7 +197,7 @@ class GameSocketManager {
       });
 
       // Broadcast to all connected clients
-      this.io.emit('player_join', {
+      const broadcastData = {
         type: 'player_join',
         playerId: playerId,
         data: {
@@ -201,10 +205,13 @@ class GameSocketManager {
           timestamp: Date.now()
         },
         timestamp: Date.now()
-      });
-
+      };
+      
+      this.io.emit('player_join', broadcastData);
+      
       console.log(`📢 Broadcasted player join to ${this.io.sockets.sockets.size} clients`);
       console.log(`📋 Sent current players list (${currentPlayers.length} players) to new player`);
+      console.log(`📤 Broadcast data:`, JSON.stringify(broadcastData, null, 2));
 
     } catch (error) {
       console.error('❌ Lobby player join error:', error);
