@@ -173,6 +173,25 @@ class GameSocketManager {
         isInLobby: true
       });
 
+      // Send current player list to the new player
+      const currentPlayers = Array.from(this.activeConnections.values())
+        .filter(p => p.isInLobby)
+        .map(p => ({
+          id: p.id || p.socketId,
+          nama: p.nama,
+          tim: p.tim,
+          joinedAt: p.joinedAt
+        }));
+
+      socket.emit('current_players', {
+        type: 'current_players',
+        data: {
+          players: currentPlayers,
+          timestamp: Date.now()
+        },
+        timestamp: Date.now()
+      });
+
       // Broadcast to all connected clients
       this.io.emit('player_join', {
         type: 'player_join',
@@ -185,6 +204,7 @@ class GameSocketManager {
       });
 
       console.log(`📢 Broadcasted player join to ${this.io.sockets.sockets.size} clients`);
+      console.log(`📋 Sent current players list (${currentPlayers.length} players) to new player`);
 
     } catch (error) {
       console.error('❌ Lobby player join error:', error);
