@@ -34,7 +34,8 @@ app.use(helmet({
       styleSrc: ["'self'", "'unsafe-inline'"],
       scriptSrc: ["'self'", "'unsafe-inline'"],
       imgSrc: ["'self'", "data:", "https:"],
-      connectSrc: ["'self'", "wss:", "ws:"]
+      connectSrc: ["'self'", "wss:", "ws:", "https://backendairsoftar-production.up.railway.app"],
+      upgradeInsecureRequests: []
     }
   }
 }));
@@ -55,8 +56,10 @@ app.use('/api/', limiter);
 
 // CORS middleware
 app.use(cors({
-  origin: "*",
-  credentials: false
+  origin: ["https://airsoftar.vercel.app", "http://localhost:3000", "http://localhost:3001"],
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"]
 }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
@@ -99,7 +102,25 @@ const gameState = {
 // Health check endpoint
 app.get("/", (req, res) => {
   res.json({
-    status: "🚀 Airsoft AR Battle Advanced PvP Server",
+    status: "🚀 Airsoft AR Battle Production Server",
+    version: "2.0.0",
+    players: gameSocket.getActiveConnections().length,
+    uptime: process.uptime(),
+    mode: "Real-Time PvP",
+    environment: process.env.NODE_ENV || "development",
+    socketio: "enabled",
+    cors: "enabled"
+  });
+});
+
+// Socket.io test endpoint
+app.get("/socket-test", (req, res) => {
+  res.json({
+    socketio: "enabled",
+    connections: gameSocket.getActiveConnections().length,
+    server: "running"
+  });
+});
     version: "2.0.0",
     players: gameSocket.getActiveConnections().size,
     uptime: process.uptime(),
