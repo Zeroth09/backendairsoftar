@@ -6,20 +6,30 @@ const cors = require('cors');
 const app = express();
 const server = http.createServer(app);
 
+// Environment variables
+const CORS_ORIGIN = process.env.CORS_ORIGIN || "https://airsoftar.vercel.app";
+const SOCKETIO_CORS_ORIGIN = process.env.SOCKETIO_CORS_ORIGIN || "https://airsoftar.vercel.app";
+const SOCKETIO_TRANSPORTS = process.env.SOCKETIO_TRANSPORTS || "websocket,polling";
+
+console.log('🔧 Environment Variables:');
+console.log('  CORS_ORIGIN:', CORS_ORIGIN);
+console.log('  SOCKETIO_CORS_ORIGIN:', SOCKETIO_CORS_ORIGIN);
+console.log('  SOCKETIO_TRANSPORTS:', SOCKETIO_TRANSPORTS);
+
 // CORS setup
 app.use(cors({
-  origin: ["https://airsoftar.vercel.app", "http://localhost:3000"],
+  origin: [CORS_ORIGIN, "http://localhost:3000"],
   credentials: true
 }));
 
 // Socket.io setup
 const io = socketIo(server, {
   cors: {
-    origin: ["https://airsoftar.vercel.app", "http://localhost:3000"],
+    origin: [SOCKETIO_CORS_ORIGIN, "http://localhost:3000"],
     credentials: true,
     methods: ["GET", "POST"]
   },
-  transports: ['websocket', 'polling']
+  transports: SOCKETIO_TRANSPORTS.split(',')
 });
 
 // Health check
