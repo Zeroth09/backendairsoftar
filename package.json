@@ -2,10 +2,10 @@
   "name": "airsoft-ar-backend",
   "version": "1.0.0",
   "description": "Real-time PvP backend server for Airsoft AR Battle - Person vs Person only",
-  "main": "deploy-production.js",
+  "main": "server-deploy.js",
   "scripts": {
-    "start": "node deploy-production.js",
-    "dev": "nodemon deploy-production.js"
+    "start": "node server-deploy.js",
+    "dev": "nodemon server-deploy.js"
   },
   "keywords": [
     "airsoft",
