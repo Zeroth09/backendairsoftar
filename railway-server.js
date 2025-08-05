@@ -28,7 +28,9 @@ app.get('/', (req, res) => {
     version: '2.0.0',
     socketio: 'enabled',
     connections: io.engine.clientsCount,
-    uptime: process.uptime()
+    uptime: process.uptime(),
+    env: process.env.NODE_ENV || 'development',
+    port: process.env.PORT || 3000
   });
 });
 
@@ -69,14 +71,17 @@ io.on('connection', (socket) => {
 
 // Start server
 const PORT = process.env.PORT || 3000;
-const HOST = process.env.HOST || '0.0.0.0';
 
-server.listen(PORT, HOST, () => {
-  console.log(`🚀 Server running on ${HOST}:${PORT}`);
+console.log('🚀 Starting Airsoft AR Battle Server...');
+console.log(`🔧 Environment: ${process.env.NODE_ENV || 'development'}`);
+console.log(`🔧 Port: ${PORT}`);
+console.log(`🔧 Process ID: ${process.pid}`);
+
+server.listen(PORT, () => {
+  console.log(`✅ Server running on port ${PORT}`);
   console.log(`🌐 Socket.io enabled`);
-  console.log(`🔗 Health: http://${HOST}:${PORT}`);
-  console.log(`🔧 Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`📊 Process ID: ${process.pid}`);
+  console.log(`🔗 Health: http://localhost:${PORT}`);
+  console.log(`🎯 Ready for connections!`);
 });
 
 // Handle process errors

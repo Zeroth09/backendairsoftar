@@ -5,7 +5,8 @@
   "main": "railway-server.js",
   "scripts": {
     "start": "node railway-server.js",
-    "dev": "nodemon railway-server.js"
+    "dev": "nodemon railway-server.js",
+    "railway": "node railway-server.js"
   },
   "keywords": [
     "airsoft",
