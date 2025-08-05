@@ -32,6 +32,19 @@ class GameSocketManager {
         timestamp: Date.now()
       });
 
+      // Lobby events (from frontend)
+      socket.on('player_join', (messageData) => {
+        this.handleLobbyPlayerJoin(socket, messageData);
+      });
+
+      socket.on('player_leave', (messageData) => {
+        this.handleLobbyPlayerLeave(socket, messageData);
+      });
+
+      socket.on('game_state', (messageData) => {
+        this.handleLobbyGameState(socket, messageData);
+      });
+
       // Player join game
       socket.on('joinGame', (playerData) => {
         this.handlePlayerJoin(socket, playerData);
@@ -142,6 +155,97 @@ class GameSocketManager {
     } catch (error) {
       console.error('❌ Player join error:', error);
       socket.emit('error', { message: 'Error joining game' });
+    }
+  }
+
+  // Lobby player join
+  handleLobbyPlayerJoin(socket, messageData) {
+    try {
+      const player = messageData.data.player;
+      const playerId = messageData.playerId;
+      
+      console.log(`🎮 Lobby: Player ${player.nama} joined team ${player.tim}`);
+
+      // Store player in lobby
+      this.activeConnections.set(playerId, {
+        ...player,
+        socketId: socket.id,
+        isInLobby: true
+      });
+
+      // Broadcast to all connected clients
+      this.io.emit('player_join', {
+        type: 'player_join',
+        playerId: playerId,
+        data: {
+          player: player,
+          timestamp: Date.now()
+        },
+        timestamp: Date.now()
+      });
+
+      console.log(`📢 Broadcasted player join to ${this.io.sockets.sockets.size} clients`);
+
+    } catch (error) {
+      console.error('❌ Lobby player join error:', error);
+      socket.emit('error', { message: 'Error joining lobby' });
+    }
+  }
+
+  // Lobby player leave
+  handleLobbyPlayerLeave(socket, messageData) {
+    try {
+      const playerId = messageData.playerId;
+      const player = messageData.data.player;
+      
+      console.log(`🎮 Lobby: Player ${player.nama} left team ${player.tim}`);
+
+      // Remove player from lobby
+      this.activeConnections.delete(playerId);
+
+      // Broadcast to all connected clients
+      this.io.emit('player_leave', {
+        type: 'player_leave',
+        playerId: playerId,
+        data: {
+          player: player,
+          timestamp: Date.now()
+        },
+        timestamp: Date.now()
+      });
+
+      console.log(`📢 Broadcasted player leave to ${this.io.sockets.sockets.size} clients`);
+
+    } catch (error) {
+      console.error('❌ Lobby player leave error:', error);
+      socket.emit('error', { message: 'Error leaving lobby' });
+    }
+  }
+
+  // Lobby game state update
+  handleLobbyGameState(socket, messageData) {
+    try {
+      const gameData = messageData.data;
+      
+      console.log(`🎮 Lobby: Game state updated - Status: ${gameData.status}`);
+
+      // Broadcast game state to all connected clients
+      this.io.emit('game_state', {
+        type: 'game_state',
+        playerId: messageData.playerId,
+        data: {
+          status: gameData.status,
+          timeLeft: gameData.timeLeft,
+          timestamp: Date.now()
+        },
+        timestamp: Date.now()
+      });
+
+      console.log(`📢 Broadcasted game state to ${this.io.sockets.sockets.size} clients`);
+
+    } catch (error) {
+      console.error('❌ Lobby game state error:', error);
+      socket.emit('error', { message: 'Error updating game state' });
     }
   }
 
