@@ -2,10 +2,10 @@
   "name": "airsoft-ar-backend",
   "version": "1.0.0",
   "description": "Real-time PvP backend server for Airsoft AR Battle - Person vs Person only",
-  "main": "simple-server.js",
+  "main": "railway-server.js",
   "scripts": {
-    "start": "node simple-server.js",
-    "dev": "nodemon simple-server.js"
+    "start": "node railway-server.js",
+    "dev": "nodemon railway-server.js"
   },
   "keywords": [
     "airsoft",
