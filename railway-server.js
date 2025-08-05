@@ -69,18 +69,41 @@ io.on('connection', (socket) => {
 
 // Start server
 const PORT = process.env.PORT || 3000;
+const HOST = process.env.HOST || '0.0.0.0';
 
-server.listen(PORT, '0.0.0.0', () => {
-  console.log(`🚀 Server running on port ${PORT}`);
+server.listen(PORT, HOST, () => {
+  console.log(`🚀 Server running on ${HOST}:${PORT}`);
   console.log(`🌐 Socket.io enabled`);
-  console.log(`🔗 Health: http://localhost:${PORT}`);
+  console.log(`🔗 Health: http://${HOST}:${PORT}`);
+  console.log(`🔧 Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`📊 Process ID: ${process.pid}`);
 });
 
 // Handle process errors
 process.on('uncaughtException', (err) => {
   console.error('❌ Uncaught Exception:', err);
+  console.error('📊 Process will exit');
+  process.exit(1);
 });
 
 process.on('unhandledRejection', (err) => {
   console.error('❌ Unhandled Rejection:', err);
+});
+
+// Handle server errors
+server.on('error', (err) => {
+  console.error('❌ Server error:', err);
+  if (err.code === 'EADDRINUSE') {
+    console.error('❌ Port already in use');
+    process.exit(1);
+  }
+});
+
+// Graceful shutdown
+process.on('SIGTERM', () => {
+  console.log('🔄 SIGTERM received, shutting down gracefully');
+  server.close(() => {
+    console.log('✅ Server closed');
+    process.exit(0);
+  });
 }); 
