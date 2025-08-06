@@ -177,6 +177,20 @@ app.get('/api/players', (req, res) => {
   });
 });
 
+// Get current players with detailed info
+app.get('/api/current-players', (req, res) => {
+  const players = Array.from(connectedPlayers.values());
+  res.json({
+    success: true,
+    type: 'current_players',
+    data: {
+      players: players,
+      timestamp: Date.now()
+    },
+    totalPlayers: players.length
+  });
+});
+
 app.post('/api/player/leave', (req, res) => {
   try {
     const { playerId } = req.body;
@@ -226,6 +240,19 @@ io.on('connection', (socket) => {
     type: 'realServer',
     timestamp: Date.now()
   });
+  
+  // Send current players list to new client
+  const currentPlayers = Array.from(connectedPlayers.values());
+  socket.emit('current_players', {
+    type: 'current_players',
+    data: {
+      players: currentPlayers,
+      timestamp: Date.now()
+    },
+    timestamp: Date.now()
+  });
+  
+  console.log(`📋 Sent current players (${currentPlayers.length}) to new client`);
   
   // Handle player join
   socket.on('player_join', (data) => {
