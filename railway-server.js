@@ -36,16 +36,20 @@ app.use(cors({
 // Parse JSON
 app.use(express.json());
 
-// Rate limiting for API endpoints
+// Rate limiting for API endpoints - More lenient for multiplayer
 const apiLimiter = rateLimit({
   windowMs: 1 * 60 * 1000, // 1 minute
-  max: 30, // limit each IP to 30 requests per windowMs
+  max: 100, // Increased to 100 requests per minute per IP
   message: {
     success: false,
     error: 'Too many requests, please try again later'
   },
   standardHeaders: true,
   legacyHeaders: false,
+  skip: (req) => {
+    // Skip rate limiting for health checks
+    return req.path === '/' || req.path === '/socket-test';
+  }
 });
 
 // Apply rate limiting to API routes
@@ -53,6 +57,17 @@ app.use('/api/', apiLimiter);
 
 // Store connected players for HTTP API
 const connectedPlayers = new Map();
+const recentRequests = new Map(); // Track recent requests to prevent duplicates
+
+// Cleanup old requests every 5 minutes
+setInterval(() => {
+  const now = Date.now();
+  for (const [playerId, timestamp] of recentRequests.entries()) {
+    if (now - timestamp > 30000) { // 30 seconds
+      recentRequests.delete(playerId);
+    }
+  }
+}, 300000); // 5 minutes
 
 // Socket.io with environment-based config
 const io = socketIo(server, {
@@ -102,12 +117,28 @@ app.post('/api/player/join', (req, res) => {
       });
     }
     
+    // Check for duplicate requests (same player within 5 seconds)
+    const now = Date.now();
+    const lastRequest = recentRequests.get(playerId);
+    if (lastRequest && (now - lastRequest) < 5000) {
+      console.log(`🔄 Duplicate request from ${playerId}, ignoring`);
+      return res.json({
+        success: true,
+        message: 'Duplicate request ignored',
+        playerId: playerId,
+        totalPlayers: connectedPlayers.size
+      });
+    }
+    
+    // Track this request
+    recentRequests.set(playerId, now);
+    
     console.log(`📥 HTTP Player join: ${playerId}`, player);
     
     // Add to connected players
     connectedPlayers.set(playerId, {
       ...player,
-      timestamp: Date.now()
+      timestamp: now
     });
     
     // Broadcast to all connected WebSocket clients
@@ -116,9 +147,9 @@ app.post('/api/player/join', (req, res) => {
       playerId: playerId,
       data: {
         player: player,
-        timestamp: Date.now()
+        timestamp: now
       },
-      timestamp: Date.now()
+      timestamp: now
     });
     
     res.json({
