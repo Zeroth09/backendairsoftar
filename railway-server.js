@@ -32,6 +32,12 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
 }));
 
+// Parse JSON
+app.use(express.json());
+
+// Store connected players for HTTP API
+const connectedPlayers = new Map();
+
 // Socket.io with environment-based config
 const io = socketIo(server, {
   cors: {
@@ -57,6 +63,69 @@ app.get('/', (req, res) => {
   });
 });
 
+// HTTP API endpoints as fallback
+app.post('/api/player/join', (req, res) => {
+  const { playerId, player } = req.body;
+  
+  console.log(`📥 HTTP Player join: ${playerId}`, player);
+  
+  // Add to connected players
+  connectedPlayers.set(playerId, {
+    ...player,
+    timestamp: Date.now()
+  });
+  
+  // Broadcast to all connected WebSocket clients
+  io.emit('player_join', {
+    type: 'player_join',
+    playerId: playerId,
+    data: {
+      player: player,
+      timestamp: Date.now()
+    },
+    timestamp: Date.now()
+  });
+  
+  res.json({
+    success: true,
+    message: 'Player joined via HTTP API',
+    playerId: playerId,
+    totalPlayers: connectedPlayers.size
+  });
+});
+
+app.get('/api/players', (req, res) => {
+  const players = Array.from(connectedPlayers.values());
+  res.json({
+    success: true,
+    players: players,
+    totalPlayers: players.length
+  });
+});
+
+app.post('/api/player/leave', (req, res) => {
+  const { playerId } = req.body;
+  
+  console.log(`📤 HTTP Player leave: ${playerId}`);
+  
+  // Remove from connected players
+  connectedPlayers.delete(playerId);
+  
+  // Broadcast to all connected WebSocket clients
+  io.emit('player_leave', {
+    type: 'player_leave',
+    playerId: playerId,
+    timestamp: Date.now()
+  });
+  
+  res.json({
+    success: true,
+    message: 'Player left via HTTP API',
+    playerId: playerId,
+    totalPlayers: connectedPlayers.size
+  });
+});
+
 // Socket connection
 io.on('connection', (socket) => {
   console.log(`🔌 Player connected: ${socket.id}`);
@@ -71,6 +140,15 @@ io.on('connection', (socket) => {
   // Handle player join
   socket.on('player_join', (data) => {
     console.log(`📥 Player join: ${socket.id}`, data);
+    
+    // Store player data
+    if (data.playerId && data.player) {
+      connectedPlayers.set(data.playerId, {
+        ...data.player,
+        socketId: socket.id,
+        timestamp: Date.now()
+      });
+    }
     
     // Broadcast to all
     io.emit('player_join', {
@@ -89,6 +167,22 @@ io.on('connection', (socket) => {
   // Handle disconnect
   socket.on('disconnect', () => {
     console.log(`🔌 Player disconnected: ${socket.id}`);
+    
+    // Remove player from connected players
+    for (const [playerId, player] of connectedPlayers.entries()) {
+      if (player.socketId === socket.id) {
+        connectedPlayers.delete(playerId);
+        console.log(`🗑️ Removed player: ${playerId}`);
+        
+        // Broadcast player leave
+        io.emit('player_leave', {
+          type: 'player_leave',
+          playerId: playerId,
+          timestamp: Date.now()
+        });
+        break;
+      }
+    }
   });
 });
 

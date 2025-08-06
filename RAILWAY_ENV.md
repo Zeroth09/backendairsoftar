@@ -49,8 +49,8 @@ LOG_LEVEL=info
 
 ### **Frontend Variables:**
 ```env
-NEXT_PUBLIC_API_URL=https://backendairsoftar-production.up.railway.app
-NEXT_PUBLIC_WS_URL=wss://backendairsoftar-production.up.railway.app
+NEXT_PUBLIC_API_URL=https://confident-clarity-production.up.railway.app
+NEXT_PUBLIC_WS_URL=wss://confident-clarity-production.up.railway.app
 ```
 
 ## 🚨 **Troubleshooting:**
