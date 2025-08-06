@@ -10,6 +10,7 @@ const server = http.createServer(app);
 
 // Store connected players
 const connectedPlayers = new Map();
+const sseClients = new Set();
 
 // CORS configuration for frontend
 app.use(cors({
@@ -28,13 +29,51 @@ app.get('/', (req, res) => {
     status: '🚀 Airsoft AR Battle Server',
     version: '2.0.0',
     socketio: 'enabled',
+    sse: 'enabled',
     connections: io.engine.clientsCount,
+    sse_clients: sseClients.size,
     players: connectedPlayers.size,
     uptime: process.uptime(),
     env: process.env.NODE_ENV || 'development',
     port: process.env.PORT || 3000,
     cors_origin: 'https://airsoftar.vercel.app',
     socketio_origin: 'https://airsoftar.vercel.app'
+  });
+});
+
+// Server-Sent Events endpoint
+app.get('/api/events', (req, res) => {
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    'Connection': 'keep-alive',
+    'Access-Control-Allow-Origin': 'https://airsoftar.vercel.app',
+    'Access-Control-Allow-Credentials': 'true'
+  });
+
+  // Send initial connection message
+  res.write(`data: ${JSON.stringify({
+    type: 'connected',
+    message: 'SSE connection established',
+    timestamp: Date.now()
+  })}\n\n`);
+
+  // Add client to SSE clients
+  sseClients.add(res);
+
+  // Send current players
+  const players = Array.from(connectedPlayers.values());
+  res.write(`data: ${JSON.stringify({
+    type: 'current_players',
+    players: players,
+    totalPlayers: players.length,
+    timestamp: Date.now()
+  })}\n\n`);
+
+  // Handle client disconnect
+  req.on('close', () => {
+    sseClients.delete(res);
+    console.log('🔌 SSE client disconnected');
   });
 });
 
@@ -59,6 +98,21 @@ app.post('/api/player/join', (req, res) => {
       timestamp: Date.now()
     },
     timestamp: Date.now()
+  });
+
+  // Broadcast to all SSE clients
+  const eventData = {
+    type: 'player_join',
+    playerId: playerId,
+    data: {
+      player: player,
+      timestamp: Date.now()
+    },
+    timestamp: Date.now()
+  };
+
+  sseClients.forEach(client => {
+    client.write(`data: ${JSON.stringify(eventData)}\n\n`);
   });
   
   res.json({
@@ -91,6 +145,17 @@ app.post('/api/player/leave', (req, res) => {
     type: 'player_leave',
     playerId: playerId,
     timestamp: Date.now()
+  });
+
+  // Broadcast to all SSE clients
+  const eventData = {
+    type: 'player_leave',
+    playerId: playerId,
+    timestamp: Date.now()
+  };
+
+  sseClients.forEach(client => {
+    client.write(`data: ${JSON.stringify(eventData)}\n\n`);
   });
   
   res.json({
@@ -177,6 +242,7 @@ console.log(`🔧 CORS Origin: https://airsoftar.vercel.app`);
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`✅ Server running on 0.0.0.0:${PORT}`);
   console.log(`🌐 Socket.io enabled`);
+  console.log(`📡 Server-Sent Events enabled`);
   console.log(`🔗 Health: http://0.0.0.0:${PORT}`);
   console.log(`🎯 Ready for connections!`);
   console.log(`🔧 CORS Origin: https://airsoftar.vercel.app`);
