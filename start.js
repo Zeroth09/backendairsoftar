@@ -8,6 +8,9 @@ const cors = require('cors');
 const app = express();
 const server = http.createServer(app);
 
+// Store connected players
+const connectedPlayers = new Map();
+
 // CORS configuration for frontend
 app.use(cors({
   origin: ['https://airsoftar.vercel.app', 'http://localhost:3000'],
@@ -15,6 +18,88 @@ app.use(cors({
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
 }));
+
+// Parse JSON
+app.use(express.json());
+
+// Health check
+app.get('/', (req, res) => {
+  res.json({
+    status: '🚀 Airsoft AR Battle Server',
+    version: '2.0.0',
+    socketio: 'enabled',
+    connections: io.engine.clientsCount,
+    players: connectedPlayers.size,
+    uptime: process.uptime(),
+    env: process.env.NODE_ENV || 'development',
+    port: process.env.PORT || 3000,
+    cors_origin: 'https://airsoftar.vercel.app',
+    socketio_origin: 'https://airsoftar.vercel.app'
+  });
+});
+
+// HTTP API endpoints as fallback
+app.post('/api/player/join', (req, res) => {
+  const { playerId, player } = req.body;
+  
+  console.log(`📥 HTTP Player join: ${playerId}`, player);
+  
+  // Add to connected players
+  connectedPlayers.set(playerId, {
+    ...player,
+    timestamp: Date.now()
+  });
+  
+  // Broadcast to all connected WebSocket clients
+  io.emit('player_join', {
+    type: 'player_join',
+    playerId: playerId,
+    data: {
+      player: player,
+      timestamp: Date.now()
+    },
+    timestamp: Date.now()
+  });
+  
+  res.json({
+    success: true,
+    message: 'Player joined via HTTP API',
+    playerId: playerId,
+    totalPlayers: connectedPlayers.size
+  });
+});
+
+app.get('/api/players', (req, res) => {
+  const players = Array.from(connectedPlayers.values());
+  res.json({
+    success: true,
+    players: players,
+    totalPlayers: players.length
+  });
+});
+
+app.post('/api/player/leave', (req, res) => {
+  const { playerId } = req.body;
+  
+  console.log(`📤 HTTP Player leave: ${playerId}`);
+  
+  // Remove from connected players
+  connectedPlayers.delete(playerId);
+  
+  // Broadcast to all connected WebSocket clients
+  io.emit('player_leave', {
+    type: 'player_leave',
+    playerId: playerId,
+    timestamp: Date.now()
+  });
+  
+  res.json({
+    success: true,
+    message: 'Player left via HTTP API',
+    playerId: playerId,
+    totalPlayers: connectedPlayers.size
+  });
+});
 
 // Socket.io with proper CORS for frontend
 const io = socketIo(server, {
@@ -24,22 +109,9 @@ const io = socketIo(server, {
     methods: ['GET', 'POST']
   },
   transports: ['polling', 'websocket'],
-  allowEIO3: true
-});
-
-// Health check
-app.get('/', (req, res) => {
-  res.json({
-    status: '🚀 Airsoft AR Battle Server',
-    version: '2.0.0',
-    socketio: 'enabled',
-    connections: io.engine.clientsCount,
-    uptime: process.uptime(),
-    env: process.env.NODE_ENV || 'development',
-    port: process.env.PORT || 3000,
-    cors_origin: 'https://airsoftar.vercel.app',
-    socketio_origin: 'https://airsoftar.vercel.app'
-  });
+  allowEIO3: true,
+  pingTimeout: 60000,
+  pingInterval: 25000
 });
 
 // Socket connection
@@ -53,9 +125,26 @@ io.on('connection', (socket) => {
     timestamp: Date.now()
   });
   
+  // Send current players list
+  const players = Array.from(connectedPlayers.values());
+  socket.emit('current_players', {
+    type: 'current_players',
+    players: players,
+    totalPlayers: players.length,
+    timestamp: Date.now()
+  });
+  
   // Handle player join
   socket.on('player_join', (data) => {
     console.log(`📥 Player join: ${socket.id}`, data);
+    
+    // Add to connected players
+    if (data.playerId && data.player) {
+      connectedPlayers.set(data.playerId, {
+        ...data.player,
+        timestamp: Date.now()
+      });
+    }
     
     // Broadcast to all
     io.emit('player_join', {
@@ -91,6 +180,7 @@ server.listen(PORT, '0.0.0.0', () => {
   console.log(`🔗 Health: http://0.0.0.0:${PORT}`);
   console.log(`🎯 Ready for connections!`);
   console.log(`🔧 CORS Origin: https://airsoftar.vercel.app`);
+  console.log(`📡 HTTP API endpoints available`);
 });
 
 // Error handling
