@@ -2,6 +2,7 @@ const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
 const cors = require('cors');
+const rateLimit = require('express-rate-limit');
 
 const app = express();
 const server = http.createServer(app);
@@ -35,6 +36,21 @@ app.use(cors({
 // Parse JSON
 app.use(express.json());
 
+// Rate limiting for API endpoints
+const apiLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000, // 1 minute
+  max: 30, // limit each IP to 30 requests per windowMs
+  message: {
+    success: false,
+    error: 'Too many requests, please try again later'
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Apply rate limiting to API routes
+app.use('/api/', apiLimiter);
+
 // Store connected players for HTTP API
 const connectedPlayers = new Map();
 
@@ -63,35 +79,62 @@ app.get('/', (req, res) => {
   });
 });
 
+// Socket.io test endpoint
+app.get('/socket-test', (req, res) => {
+  res.json({
+    socketio: 'enabled',
+    transports: SOCKETIO_TRANSPORTS,
+    cors_origin: SOCKETIO_CORS_ORIGIN,
+    connections: io.engine.clientsCount,
+    timestamp: Date.now()
+  });
+});
+
 // HTTP API endpoints as fallback
 app.post('/api/player/join', (req, res) => {
-  const { playerId, player } = req.body;
-  
-  console.log(`📥 HTTP Player join: ${playerId}`, player);
-  
-  // Add to connected players
-  connectedPlayers.set(playerId, {
-    ...player,
-    timestamp: Date.now()
-  });
-  
-  // Broadcast to all connected WebSocket clients
-  io.emit('player_join', {
-    type: 'player_join',
-    playerId: playerId,
-    data: {
-      player: player,
+  try {
+    const { playerId, player } = req.body;
+    
+    if (!playerId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Player ID is required'
+      });
+    }
+    
+    console.log(`📥 HTTP Player join: ${playerId}`, player);
+    
+    // Add to connected players
+    connectedPlayers.set(playerId, {
+      ...player,
       timestamp: Date.now()
-    },
-    timestamp: Date.now()
-  });
-  
-  res.json({
-    success: true,
-    message: 'Player joined via HTTP API',
-    playerId: playerId,
-    totalPlayers: connectedPlayers.size
-  });
+    });
+    
+    // Broadcast to all connected WebSocket clients
+    io.emit('player_join', {
+      type: 'player_join',
+      playerId: playerId,
+      data: {
+        player: player,
+        timestamp: Date.now()
+      },
+      timestamp: Date.now()
+    });
+    
+    res.json({
+      success: true,
+      message: 'Player joined via HTTP API',
+      playerId: playerId,
+      totalPlayers: connectedPlayers.size
+    });
+  } catch (error) {
+    console.error('❌ Error in player join API:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error',
+      message: error.message
+    });
+  }
 });
 
 app.get('/api/players', (req, res) => {
@@ -104,26 +147,42 @@ app.get('/api/players', (req, res) => {
 });
 
 app.post('/api/player/leave', (req, res) => {
-  const { playerId } = req.body;
-  
-  console.log(`📤 HTTP Player leave: ${playerId}`);
-  
-  // Remove from connected players
-  connectedPlayers.delete(playerId);
-  
-  // Broadcast to all connected WebSocket clients
-  io.emit('player_leave', {
-    type: 'player_leave',
-    playerId: playerId,
-    timestamp: Date.now()
-  });
-  
-  res.json({
-    success: true,
-    message: 'Player left via HTTP API',
-    playerId: playerId,
-    totalPlayers: connectedPlayers.size
-  });
+  try {
+    const { playerId } = req.body;
+    
+    if (!playerId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Player ID is required'
+      });
+    }
+    
+    console.log(`📤 HTTP Player leave: ${playerId}`);
+    
+    // Remove from connected players
+    connectedPlayers.delete(playerId);
+    
+    // Broadcast to all connected WebSocket clients
+    io.emit('player_leave', {
+      type: 'player_leave',
+      playerId: playerId,
+      timestamp: Date.now()
+    });
+    
+    res.json({
+      success: true,
+      message: 'Player left via HTTP API',
+      playerId: playerId,
+      totalPlayers: connectedPlayers.size
+    });
+  } catch (error) {
+    console.error('❌ Error in player leave API:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error',
+      message: error.message
+    });
+  }
 });
 
 // Socket connection
